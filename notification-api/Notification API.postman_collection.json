@@ -1,0 +1,467 @@
+{
+  "info": {
+    "_postman_id": "b19a4a31-4609-45f1-b2c2-087a61469223",
+    "name": "Notification API",
+    "description": "Collection de test pour l'API de notifications. Démarrez l'API avec `npm start` dans notification-api et renseignez apiToken et adminToken dans les variables. Les requêtes d'envoi email/SMS tentent une livraison réelle : utilisez uniquement des destinataires que vous contrôlez.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Système",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Vérifie que l'API est démarrée et répond."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Le statut HTTP est 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('L’API indique que son état est ok', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property('status', 'ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Email",
+      "item": [
+        {
+          "name": "Valider les champs requis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{apiToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test API\",\n  \"text\": \"Ce test doit être rejeté : le destinataire est absent.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "email"
+              ]
+            },
+            "description": "Vérifie la validation sans envoyer d'email."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Le statut HTTP est 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('La réponse signale une erreur de validation', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property('success', false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Envoyer un email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{apiToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"{{emailTo}}\",\n  \"subject\": \"Test Notification API\",\n  \"text\": \"Message de test envoyé par la collection Postman.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/email",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "email"
+              ]
+            },
+            "description": "Envoie un email réel via Gmail à emailTo. Configurez les identifiants Gmail dans la plateforme ou dans .env avant d'exécuter cette requête."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Le statut HTTP est 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('La réponse confirme l’envoi', function () {",
+                  "  const payload = pm.response.json();",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload.data.accepted).to.include(pm.variables.get('emailTo'));",
+                  "  pm.expect(payload.data.messageId).to.be.a('string').and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SMS",
+      "item": [
+        {
+          "name": "Valider les champs requis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{apiToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"Ce test doit être rejeté : le destinataire est absent.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "sms"
+              ]
+            },
+            "description": "Vérifie la validation sans envoyer de SMS."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Le statut HTTP est 400', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "});",
+                  "pm.test('La réponse signale une erreur de validation', function () {",
+                  "  pm.expect(pm.response.json()).to.have.property('success', false);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Envoyer un SMS",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{apiToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"to\": \"{{smsTo}}\",\n  \"body\": \"Message de test envoyé par la collection Postman.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/sms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "notifications",
+                "sms"
+              ]
+            },
+            "description": "Tente une soumission SMS via Vonage. Configurez Vonage dans la plateforme ou dans .env et utilisez un numéro que vous contrôlez. La soumission dépend du compte et des règles du pays destinataire."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Le statut HTTP est 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('La réponse confirme l’envoi', function () {",
+                  "  const payload = pm.response.json();",
+                  "  pm.expect(payload).to.have.property('success', true);",
+                  "  pm.expect(payload.data).to.have.property('status', 'accepted');",
+                  "  pm.expect(payload.data.messageId).to.be.a('string').and.not.empty;",
+                  "  pm.expect(payload.data.to).to.equal(pm.variables.get('smsTo'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    }
+,
+    {
+                    "name": "Administration",
+                    "item": [
+                      {
+                        "name": "Vue d’ensemble",
+                        "request": {
+                          "method": "GET",
+                          "header": [
+                            {
+                              "key": "Authorization",
+                              "value": "Bearer {{adminToken}}"
+                            }
+                          ],
+                          "url": {
+                            "raw": "{{baseUrl}}/api/admin/overview",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "admin", "overview"]
+                          },
+                          "description": "Retourne les statistiques, les connexions configurées et les dernières notifications."
+                        },
+                        "response": []
+                      },
+                      {
+                        "name": "Historique des notifications",
+                        "request": {
+                          "method": "GET",
+                          "header": [
+                            {
+                              "key": "Authorization",
+                              "value": "Bearer {{adminToken}}"
+                            }
+                          ],
+                          "url": {
+                            "raw": "{{baseUrl}}/api/admin/notifications?limit=50",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "admin", "notifications"],
+                            "query": [
+                              {
+                                "key": "limit",
+                                "value": "50"
+                              }
+                            ]
+                          },
+                          "description": "Liste les dernières notifications et leur résultat fournisseur."
+                        },
+                        "response": []
+                      },
+                      {
+                        "name": "État de la configuration",
+                        "request": {
+                          "method": "GET",
+                          "header": [
+                            {
+                              "key": "Authorization",
+                              "value": "Bearer {{adminToken}}"
+                            }
+                          ],
+                          "url": {
+                            "raw": "{{baseUrl}}/api/admin/settings",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "admin", "settings"]
+                          },
+                          "description": "Retourne les statuts des fournisseurs sans révéler les secrets enregistrés."
+                        },
+                        "response": []
+                      },
+                      {
+                        "name": "Enregistrer la configuration email",
+                        "request": {
+                          "method": "PUT",
+                          "header": [
+                            {
+                              "key": "Content-Type",
+                              "value": "application/json"
+                            },
+                            {
+                              "key": "Authorization",
+                              "value": "Bearer {{adminToken}}"
+                            }
+                          ],
+                          "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"user\": \"{{gmailUser}}\",\n  \"appPassword\": \"{{gmailAppPassword}}\"\n}",
+                            "options": {
+                              "raw": {
+                                "language": "json"
+                              }
+                            }
+                          },
+                          "url": {
+                            "raw": "{{baseUrl}}/api/admin/settings/email",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "admin", "settings", "email"]
+                          },
+                          "description": "Enregistre les identifiants Gmail. Le secret doit être chiffré par la clé SETTINGS_ENCRYPTION_KEY."
+                        },
+                        "response": []
+                      },
+                      {
+                        "name": "Enregistrer la configuration SMS",
+                        "request": {
+                          "method": "PUT",
+                          "header": [
+                            {
+                              "key": "Content-Type",
+                              "value": "application/json"
+                            },
+                            {
+                              "key": "Authorization",
+                              "value": "Bearer {{adminToken}}"
+                            }
+                          ],
+                          "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"apiKey\": \"{{vonageApiKey}}\",\n  \"apiSecret\": \"{{vonageApiSecret}}\",\n  \"sender\": \"{{vonageSender}}\"\n}",
+                            "options": {
+                              "raw": {
+                                "language": "json"
+                              }
+                            }
+                          },
+                          "url": {
+                            "raw": "{{baseUrl}}/api/admin/settings/sms",
+                            "host": ["{{baseUrl}}"],
+                            "path": ["api", "admin", "settings", "sms"]
+                          },
+                          "description": "Enregistre les identifiants Vonage. Le secret doit être chiffré par la clé SETTINGS_ENCRYPTION_KEY."
+                        },
+                        "response": []
+                      }
+                    ]
+                  }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "default"
+    },
+    {
+      "key": "emailTo",
+      "value": "francdaryl4@gmail.com",
+      "type": "default"
+    },
+    {
+      "key": "smsTo",
+      "value": "+15005550006",
+      "type": "default"
+    },
+    {
+      "key": "apiToken",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "gmailUser",
+      "value": "",
+      "type": "default"
+    },
+    {
+      "key": "gmailAppPassword",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "vonageApiKey",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "vonageApiSecret",
+      "value": "",
+      "type": "secret"
+    },
+    {
+      "key": "vonageSender",
+      "value": "",
+      "type": "default"
+    }
+  ]
+}
