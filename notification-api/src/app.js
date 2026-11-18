@@ -331,7 +331,18 @@ function createApp(options = {}) {
       return next(error);
     }
 
-    res.status(error.statusCode || 500).json({
+    const statusCode = error.statusCode || 500;
+    if (statusCode >= 500) {
+      const message = error instanceof Error ? error.message : "Non-Error exception";
+      console.error("Unhandled API error", {
+        path: req.path,
+        name: error instanceof Error ? error.name : "Error",
+        code: error && typeof error.code === "string" ? error.code : undefined,
+        message: message.replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, "[redacted database URL]"),
+      });
+    }
+
+    res.status(statusCode).json({
       success: false,
       message: error.statusCode ? error.message : "An unexpected server error occurred.",
     });

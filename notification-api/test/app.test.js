@@ -38,6 +38,47 @@ test("GET /health returns the API status", withTestServer(createApp(), async (po
   assert.deepEqual(await response.json(), { status: "ok" });
 }));
 
+test("unexpected server errors are logged without exposing database URLs", withTestServer(
+  createApp({
+    repository: {
+      async getOverview() {
+        const error = new Error("Could not connect to postgresql://user:password@db.example/test");
+        error.code = "P1001";
+        throw error;
+      },
+    },
+  }),
+  async (port) => {
+    const previousToken = process.env.ADMIN_API_TOKEN;
+    const previousConsoleError = console.error;
+    let loggedError;
+    process.env.ADMIN_API_TOKEN = "admin-test-token";
+    console.error = (message, details) => {
+      loggedError = { message, details };
+    };
+
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/api/admin/overview`, {
+        headers: { Authorization: "Bearer admin-test-token" },
+      });
+
+      assert.equal(response.status, 500);
+      assert.deepEqual(await response.json(), {
+        success: false,
+        message: "An unexpected server error occurred.",
+      });
+      assert.equal(loggedError.message, "Unhandled API error");
+      assert.equal(loggedError.details.code, "P1001");
+      assert.equal(loggedError.details.message.includes("password"), false);
+      assert.match(loggedError.details.message, /\[redacted database URL\]/);
+    } finally {
+      console.error = previousConsoleError;
+      if (previousToken === undefined) delete process.env.ADMIN_API_TOKEN;
+      else process.env.ADMIN_API_TOKEN = previousToken;
+    }
+  },
+));
+
 test("CORS allows the configured frontend origin", withTestServer(
   createApp({ allowedOrigins: ["https://dashboard.example"] }),
   async (port) => {
