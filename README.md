@@ -70,7 +70,7 @@ Pour les déploiements Preview Vercel, ajouter leurs origines à `FRONTEND_URL` 
 Les identifiants peuvent être fournis par les variables d’environnement de l’API ou configurés dans le tableau de bord :
 
 - Email : adresse Gmail et mot de passe d’application Google.
-- SMS : clé API, secret API et expéditeur Vonage autorisé.
+- SMS : clé API, secret API et expéditeur Vonage autorisé. L’API utilise le SDK Vonage Messages API (`@vonage/messages`) avec le canal SMS; une réponse acceptée fournit un identifiant de message, mais ne garantit pas la livraison au téléphone.
 
 Pour modifier seulement l’adresse ou l’expéditeur depuis la console, laisser le champ secret vide : le secret déjà enregistré est conservé. L’API ne renvoie jamais les secrets enregistrés.
 

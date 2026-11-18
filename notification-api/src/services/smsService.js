@@ -1,4 +1,5 @@
 const { Vonage } = require("@vonage/server-sdk");
+const { SMS } = require("@vonage/messages");
 
 function createSmsService({
   createClient = (apiKey, apiSecret) => new Vonage({ apiKey, apiSecret }),
@@ -42,35 +43,22 @@ function createSmsService({
 
     let response;
     try {
-      response = await client.sms.send({
+      response = await client.messages.send(new SMS({
         text: body.trim(),
         from: sender,
         to: to.trim().replace(/^\+/, ""),
-      });
+      }));
     } catch (error) {
-      const deliveryError = new Error("Vonage could not complete SMS submission.");
+      const deliveryError = new Error("Vonage Messages API could not submit the SMS.");
       if (error && typeof error.code === "string") {
         deliveryError.code = error.code;
       }
       throw deliveryError;
     }
 
-    const message = response && Array.isArray(response.messages) ? response.messages[0] : null;
-    if (!message) {
-      throw new Error("Vonage returned no SMS submission result.");
-    }
-
-    if (message.status !== "0") {
-      const submissionError = new Error("Vonage rejected the SMS submission.");
-      if (typeof message.status === "string") {
-        submissionError.code = message.status;
-      }
-      throw submissionError;
-    }
-
-    const messageId = message["message-id"] || message.messageId;
+    const messageId = response && response.messageUUID;
     if (typeof messageId !== "string" || messageId === "") {
-      throw new Error("Vonage accepted the SMS but returned no message ID.");
+      throw new Error("Vonage Messages API returned no message UUID.");
     }
 
     return {

@@ -34,10 +34,16 @@ test("sendSms submits the message to Vonage and returns submission metadata", as
       createClient(apiKey, apiSecret) {
         clientOptions = { apiKey, apiSecret };
         return {
-          sms: {
-            async send(options) {
-              messageOptions = options;
-              return { messages: [{ "message-id": "VN123", status: "0" }] };
+          messages: {
+            async send(message) {
+              messageOptions = {
+                text: message.text,
+                from: message.from,
+                to: message.to,
+                channel: message.channel,
+                messageType: message.messageType,
+              };
+              return { messageUUID: "VN123" };
             },
           },
         };
@@ -54,6 +60,8 @@ test("sendSms submits the message to Vonage and returns submission metadata", as
       text: "Hello from tests",
       from: "NotificationAPI",
       to: "15550002222",
+      channel: "sms",
+      messageType: "text",
     });
     assert.deepEqual(result, {
       messageId: "VN123",
@@ -78,10 +86,10 @@ test("sendSms trims surrounding whitespace from credential values", async () => 
         assert.equal(apiKey, "api-key-123");
         assert.equal(apiSecret, "api-secret-123");
         return {
-          sms: {
-            async send(options) {
-              assert.equal(options.from, "NotificationAPI");
-              return { messages: [{ "message-id": "VN123", status: "0" }] };
+          messages: {
+            async send(message) {
+              assert.equal(message.from, "NotificationAPI");
+              return { messageUUID: "VN123" };
             },
           },
         };
@@ -103,16 +111,16 @@ test("sendSms trims surrounding whitespace from credential values", async () => 
   }
 });
 
-test("sendSms rejects a message Vonage did not accept", async () => {
+test("sendSms reports a rejected Messages API request", async () => {
   const restoreCredentials = setVonageCredentials();
 
   try {
     const smsService = createSmsService({
       createClient() {
         return {
-          sms: {
+          messages: {
             async send() {
-              return { messages: [{ status: "1", "error-text": "Missing params" }] };
+              throw Object.assign(new Error("Vonage rejected the request."), { code: "400" });
             },
           },
         };
@@ -124,7 +132,11 @@ test("sendSms rejects a message Vonage did not accept", async () => {
         to: "+15550002222",
         body: "Hello from tests",
       }),
-      /Vonage rejected the SMS submission/,
+      (error) => {
+        assert.match(error.message, /Vonage Messages API could not submit the SMS/);
+        assert.equal(error.code, "400");
+        return true;
+      },
     );
   } finally {
     restoreCredentials();
@@ -145,7 +157,7 @@ test("sendSms requires Vonage credentials before creating a client", async () =>
     const smsService = createSmsService({
       createClient() {
         clientCreated = true;
-        return { sms: { send: async () => ({ messages: [{ "message-id": "VN123", status: "0" }] }) } };
+        return { messages: { send: async () => ({ messageUUID: "VN123" }) } };
       },
     });
 
