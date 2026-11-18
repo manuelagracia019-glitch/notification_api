@@ -5,6 +5,7 @@ const { timingSafeEqual } = require("node:crypto");
 
 const { createEmailService } = require("./services/emailService");
 const { createSmsService } = require("./services/smsService");
+const { createVerifyService } = require("./services/verifyService");
 
 function getEnvironmentConfig(provider) {
   if (provider === "email") {
@@ -40,6 +41,7 @@ function createApp(options = {}) {
   const smsSender = options.smsSender || createSmsService({
     getCredentials: () => getProviderConfig("sms"),
   }).sendSms;
+  const verifyService = options.verifyService || createVerifyService();
 
   app.disable("x-powered-by");
   app.use(cors({
@@ -110,6 +112,50 @@ function createApp(options = {}) {
       return res.status(401).json({ success: false, message: "Unauthorized." });
     }
     return next();
+  });
+
+  app.post("/api/notifications/verify/start", async (req, res) => {
+    try {
+      const result = await verifyService.startVerification({
+        to: req.body && req.body.to,
+        brand: req.body && req.body.brand,
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(error instanceof TypeError ? 400 : 502).json({
+        success: false,
+        message: error.message || "Unable to start phone verification.",
+      });
+    }
+  });
+
+  app.post("/api/notifications/verify/check", async (req, res) => {
+    try {
+      const result = await verifyService.checkCode({
+        requestId: req.body && req.body.requestId,
+        code: req.body && req.body.code,
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(error instanceof TypeError ? 400 : 502).json({
+        success: false,
+        message: error.message || "Unable to check the verification code.",
+      });
+    }
+  });
+
+  app.post("/api/notifications/verify/next-workflow", async (req, res) => {
+    try {
+      const result = await verifyService.nextWorkflow({
+        requestId: req.body && req.body.requestId,
+      });
+      res.json({ success: true, data: result });
+    } catch (error) {
+      res.status(error instanceof TypeError ? 400 : 502).json({
+        success: false,
+        message: error.message || "Unable to start the next verification workflow.",
+      });
+    }
   });
 
   app.get("/api/admin/overview", async (req, res, next) => {

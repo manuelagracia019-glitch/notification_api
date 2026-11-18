@@ -55,7 +55,7 @@ Déployer l’API et le tableau de bord comme deux services séparés :
 
 1. Sur Railway, créer un service PostgreSQL et importer le dépôt comme un second service avec `notification/notification-api` comme dossier racine. Définir la commande de build `npm run build`, la commande de démarrage `npm start` et le healthcheck `/health`.
 2. Dans les variables du service API Railway, définir `DATABASE_URL` comme référence à la variable `DATABASE_URL` du service PostgreSQL Railway. Supprimer toute ancienne variable `DATABASE_URL_UNPOOLED` qui pointe vers Neon : Prisma utilise cette variable en priorité pour les migrations. Sans elle, les migrations utilisent `DATABASE_URL` et donc PostgreSQL Railway.
-3. Configurer aussi `ADMIN_API_TOKEN`, `NOTIFICATION_API_TOKEN` et `SETTINGS_ENCRYPTION_KEY` dans le service API. `PORT` est fourni par Railway. Les variables Gmail/Vonage sont facultatives si les fournisseurs sont configurés depuis le tableau de bord.
+3. Configurer aussi `ADMIN_API_TOKEN`, `NOTIFICATION_API_TOKEN` et `SETTINGS_ENCRYPTION_KEY` dans le service API. `PORT` est fourni par Railway. Les variables Gmail/Vonage sont facultatives si les fournisseurs sont configurés depuis le tableau de bord. Pour Verify v2, configurer `VONAGE_APPLICATION_ID` et `VONAGE_APPLICATION_PRIVATE_KEY` dans le service API.
 4. Créer le domaine public Railway, puis configurer `FRONTEND_URL` avec l’origine exacte du site Vercel, sans chemin ni slash final. Plusieurs origines peuvent être séparées par des virgules. Les requêtes sans en-tête `Origin` restent acceptées; les requêtes navigateur ne sont autorisées que depuis ces origines.
 5. Exécuter `npm run migrate:deploy` comme commande pre-deploy Railway afin de créer le schéma PostgreSQL dans la base Railway.
 6. Sur Vercel, importer le même dépôt comme un second projet avec `notification/notification-web` comme dossier racine. Ajouter `NEXT_PUBLIC_API_URL` avec l’URL publique Railway, puis déployer. Cette variable étant intégrée au build du frontend, redéployer après l’avoir modifiée.
@@ -70,7 +70,8 @@ Pour les déploiements Preview Vercel, ajouter leurs origines à `FRONTEND_URL` 
 Les identifiants peuvent être fournis par les variables d’environnement de l’API ou configurés dans le tableau de bord :
 
 - Email : adresse Gmail et mot de passe d’application Google.
-- SMS : clé API, secret API et expéditeur Vonage autorisé. L’API utilise le SDK Vonage Messages API (`@vonage/messages`) avec le canal SMS; une réponse acceptée fournit un identifiant de message, mais ne garantit pas la livraison au téléphone.
+- SMS libre : clé API, secret API et expéditeur Vonage autorisé. L’API utilise le SDK Vonage Messages API (`@vonage/messages`) avec le canal SMS; une réponse acceptée fournit un identifiant de message, mais ne garantit pas la livraison au téléphone.
+- Vérification OTP : créer une application Vonage et configurer son Application ID ainsi que sa clé privée en PEM dans `VONAGE_APPLICATION_ID` et `VONAGE_APPLICATION_PRIVATE_KEY`. L’option « Code OTP » envoie un code Verify v2 par SMS avec un appel vocal comme étape de secours; l’utilisateur doit ensuite saisir le code dans le tableau de bord.
 
 Pour modifier seulement l’adresse ou l’expéditeur depuis la console, laisser le champ secret vide : le secret déjà enregistré est conservé. L’API ne renvoie jamais les secrets enregistrés.
 
@@ -81,6 +82,9 @@ Toutes les réponses d’envoi sont protégées par `Authorization: Bearer <NOTI
 - `GET /health`
 - `POST /api/notifications/email` — `{ "to", "subject", "text" }`
 - `POST /api/notifications/sms` — `{ "to", "body" }`
+- `POST /api/notifications/verify/start` — `{ "to", "brand" }`, démarre Verify v2 avec SMS puis appel vocal
+- `POST /api/notifications/verify/check` — `{ "requestId", "code" }`, vérifie le code reçu
+- `POST /api/notifications/verify/next-workflow` — `{ "requestId" }`, demande le workflow suivant
 - `GET /api/admin/overview`
 - `GET /api/admin/notifications?limit=50` — maximum 100
 - `GET /api/admin/settings`

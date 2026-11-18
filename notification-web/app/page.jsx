@@ -31,6 +31,8 @@ export default function Dashboard() {
   const [history, setHistory] = useState([]);
   const [settings, setSettings] = useState(null);
   const [channel, setChannel] = useState("email");
+  const [verificationRequest, setVerificationRequest] = useState(null);
+  const [verificationCode, setVerificationCode] = useState("");
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   const [historyFilter, setHistoryFilter] = useState("all");
@@ -118,14 +120,28 @@ export default function Dashboard() {
           subject: formData.get("subject"),
           text: formData.get("content"),
         }
-      : { to: formData.get("to"), body: formData.get("content") };
+      : channel === "sms"
+        ? { to: formData.get("to"), body: formData.get("content") }
+        : { to: formData.get("to"), brand: formData.get("brand") };
     setBusy(true);
     setNotice(null);
     try {
-      const data = await request(`/api/notifications/${channel}`, {
+      const endpoint = channel === "verify"
+        ? "/api/notifications/verify/start"
+        : `/api/notifications/${channel}`;
+      const data = await request(endpoint, {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      if (channel === "verify") {
+        setVerificationRequest({ requestId: data.requestId, to: payload.to });
+        setVerificationCode("");
+        setNotice({
+          type: "success",
+          text: "Code de vérification demandé. Si le SMS n’arrive pas, l’appel vocal est prévu en secours.",
+        });
+        return;
+      }
       setNotice({
         type: "success",
         text: `${channel === "email" ? "Email" : "SMS"} transmis avec succès · ${data.data?.messageId || data.messageId || "confirmation reçue"}`,
@@ -138,6 +154,55 @@ export default function Dashboard() {
     } catch (error) {
       setNotice({ type: "error", text: error.message });
       await refreshOverview().catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function checkVerificationCode(event) {
+    event.preventDefault();
+    if (!verificationRequest) return;
+
+    setBusy(true);
+    setNotice(null);
+    try {
+      const result = await request("/api/notifications/verify/check", {
+        method: "POST",
+        body: JSON.stringify({
+          requestId: verificationRequest.requestId,
+          code: verificationCode,
+        }),
+      });
+      if (result.verified) {
+        setNotice({ type: "success", text: "Numéro vérifié avec succès." });
+        setVerificationRequest(null);
+        setVerificationCode("");
+      } else {
+        setNotice({
+          type: "error",
+          text: `Vérification non terminée (${result.status || "statut inconnu"}).`,
+        });
+      }
+    } catch (error) {
+      setNotice({ type: "error", text: error.message });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function advanceVerificationWorkflow() {
+    if (!verificationRequest) return;
+
+    setBusy(true);
+    setNotice(null);
+    try {
+      await request("/api/notifications/verify/next-workflow", {
+        method: "POST",
+        body: JSON.stringify({ requestId: verificationRequest.requestId }),
+      });
+      setNotice({ type: "success", text: "L’étape suivante a été demandée. Vonage peut appeler ce numéro." });
+    } catch (error) {
+      setNotice({ type: "error", text: error.message });
     } finally {
       setBusy(false);
     }
@@ -249,17 +314,33 @@ export default function Dashboard() {
                 <div className="channel-tabs" role="tablist">
                   <button className={channel === "email" ? "selected" : ""} onClick={() => setChannel("email")} type="button">✉ Email</button>
                   <button className={channel === "sms" ? "selected" : ""} onClick={() => setChannel("sms")} type="button">▣ SMS</button>
+                  <button className={channel === "verify" ? "selected" : ""} onClick={() => setChannel("verify")} type="button">✓ Code OTP</button>
                 </div>
                 <form className="form-grid" onSubmit={submitNotification}>
                   <div className="field full"><label htmlFor="recipient">{channel === "email" ? "Adresse email" : "Numéro de téléphone"}</label>
-                    <input id="recipient" name="to" type={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "nom@exemple.com" : "+33 6 12 34 56 78"} required /></div>
+                    <input id="recipient" name="to" type={channel === "email" ? "email" : "tel"} placeholder={channel === "email" ? "nom@exemple.com" : "+237 6 52 23 61 42"} required /></div>
                   {channel === "email" && <div className="field full"><label htmlFor="subject">Objet</label><input id="subject" name="subject" maxLength="200" placeholder="Objet de votre email" required /></div>}
-                  <div className="field full"><label htmlFor="content">{channel === "email" ? "Message" : "Message SMS"}</label>
-                    <textarea id="content" name="content" rows="6" maxLength={channel === "sms" ? 1600 : undefined} placeholder="Rédigez votre message…" required /></div>
+                  {channel === "verify" && <div className="field full"><label htmlFor="verify-brand">Nom affiché dans le code</label>
+                    <input id="verify-brand" name="brand" maxLength="20" defaultValue="Courrier" required /></div>}
+                  {channel !== "verify" && <div className="field full"><label htmlFor="content">{channel === "email" ? "Message" : "Message SMS"}</label>
+                    <textarea id="content" name="content" rows="6" maxLength={channel === "sms" ? 1600 : undefined} placeholder="Rédigez votre message…" required /></div>}
                   {channel === "sms" && <div className="form-hint full">Les frais et limites dépendent de votre compte Vonage et du pays de destination.</div>}
+                  {channel === "verify" && <div className="form-hint full">Vonage envoie un code à 5 chiffres par SMS, puis peut passer à un appel vocal. Des frais Verify peuvent s’appliquer.</div>}
                   <div className="form-actions full"><span className="form-hint">L’envoi utilise la configuration enregistrée sur le serveur.</span>
-                    <button className="primary-button" disabled={busy}>{busy ? "Envoi…" : "Envoyer maintenant"} <span>→</span></button></div>
+                    <button className="primary-button" disabled={busy}>{busy ? "Envoi…" : channel === "verify" ? "Demander un code" : "Envoyer maintenant"} <span>→</span></button></div>
                 </form>
+                {channel === "verify" && verificationRequest && (
+                  <form className="form-grid" onSubmit={checkVerificationCode}>
+                    <div className="form-hint full">Code envoyé à {verificationRequest.to}. Saisis le code reçu pour vérifier le numéro.</div>
+                    <div className="field full"><label htmlFor="verification-code">Code de vérification</label>
+                      <input id="verification-code" type="text" inputMode="numeric" pattern="[0-9]{4,10}" maxLength="10"
+                        value={verificationCode} onChange={(event) => setVerificationCode(event.target.value)} required /></div>
+                    <div className="form-actions full">
+                      <button className="primary-button" disabled={busy}>Vérifier le code <span>→</span></button>
+                      <button className="outline-button" type="button" disabled={busy} onClick={advanceVerificationWorkflow}>Demander l’appel vocal</button>
+                    </div>
+                  </form>
+                )}
               </div>
             </section>
           )}

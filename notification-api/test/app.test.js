@@ -190,6 +190,65 @@ test("POST /api/notifications/sms submits an SMS through the service", withTestS
   },
 ));
 
+test("phone verification routes start, check, and advance an authenticated Verify request", withTestServer(
+  createApp({
+    notificationApiToken: TEST_API_TOKEN,
+    verifyService: {
+      async startVerification(params) {
+        assert.deepEqual(params, { to: "+15550002222", brand: "Courrier" });
+        return { requestId: "verify-request-id" };
+      },
+      async checkCode(params) {
+        assert.deepEqual(params, { requestId: "verify-request-id", code: "12345" });
+        return { status: "completed", verified: true };
+      },
+      async nextWorkflow(params) {
+        assert.deepEqual(params, { requestId: "verify-request-id" });
+        return { advanced: true };
+      },
+    },
+  }),
+  async (port) => {
+    const request = (path, body) => fetch(`http://127.0.0.1:${port}${path}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${TEST_API_TOKEN}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const startResponse = await request("/api/notifications/verify/start", {
+      to: "+15550002222",
+      brand: "Courrier",
+    });
+    assert.equal(startResponse.status, 200);
+    assert.deepEqual(await startResponse.json(), {
+      success: true,
+      data: { requestId: "verify-request-id" },
+    });
+
+    const checkResponse = await request("/api/notifications/verify/check", {
+      requestId: "verify-request-id",
+      code: "12345",
+    });
+    assert.equal(checkResponse.status, 200);
+    assert.deepEqual(await checkResponse.json(), {
+      success: true,
+      data: { status: "completed", verified: true },
+    });
+
+    const nextResponse = await request("/api/notifications/verify/next-workflow", {
+      requestId: "verify-request-id",
+    });
+    assert.equal(nextResponse.status, 200);
+    assert.deepEqual(await nextResponse.json(), {
+      success: true,
+      data: { advanced: true },
+    });
+  },
+));
+
 test("POST /api/notifications/sms rejects a missing recipient before provider access", withTestServer(
   createApp({ notificationApiToken: TEST_API_TOKEN }),
   async (port) => {
@@ -225,6 +284,14 @@ test("notification endpoints reject requests without a valid API token", withTes
 
     assert.equal(response.status, 401);
     assert.deepEqual(await response.json(), { success: false, message: "Unauthorized." });
+
+    const verifyResponse = await fetch(`http://127.0.0.1:${port}/api/notifications/verify/start`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to: "+15550002222", brand: "Courrier" }),
+    });
+    assert.equal(verifyResponse.status, 401);
+    assert.deepEqual(await verifyResponse.json(), { success: false, message: "Unauthorized." });
   },
 ));
 
