@@ -22,7 +22,7 @@ node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 
 Exécuter la commande **trois fois**, en générant une valeur différente à chaque fois : une pour `NOTIFICATION_API_TOKEN`, une pour `ADMIN_API_TOKEN` et une pour `SETTINGS_ENCRYPTION_KEY`. Ne réutilisez pas une valeur d’un champ à l’autre. Conservez ces valeurs dans le fichier `.env` local (non versionné), jamais dans une collection Postman partagée. Sauvegardez séparément `SETTINGS_ENCRYPTION_KEY` : la perdre rend les identifiants fournisseur enregistrés indéchiffrables.
 
-Avec Neon, utilisez l’URL pooled comme `DATABASE_URL` pour les requêtes de l’API et l’URL directe (sans `-pooler`) comme `DATABASE_URL_UNPOOLED` pour les migrations Prisma.
+Pour le développement local, renseignez `DATABASE_URL` avec l’URL de la base PostgreSQL utilisée. Si vous choisissez Neon, utilisez l’URL pooled pour `DATABASE_URL` et l’URL directe (sans `-pooler`) pour `DATABASE_URL_UNPOOLED`.
 
 Appliquer le schéma et démarrer l’API :
 
@@ -53,12 +53,15 @@ Ouvrir `http://localhost:3000`, puis saisir `ADMIN_API_TOKEN`. Le tableau de bor
 
 Déployer l’API et le tableau de bord comme deux services séparés :
 
-1. Sur Railway, importer le dépôt et choisir `notification/notification-api` comme dossier racine. Définir la commande de build `npm run build`, la commande de démarrage `npm start` et le healthcheck `/health`.
-2. Configurer dans Railway `DATABASE_URL` (URL Neon pooled), `DATABASE_URL_UNPOOLED` (URL directe pour les migrations), `ADMIN_API_TOKEN`, `NOTIFICATION_API_TOKEN` et `SETTINGS_ENCRYPTION_KEY`. `PORT` est fourni par Railway. Les variables Gmail/Vonage sont facultatives si les fournisseurs sont configurés depuis le tableau de bord.
-3. Créer le domaine public Railway, puis configurer `FRONTEND_URL` avec l’origine exacte du site Vercel, sans chemin ni slash final. Plusieurs origines peuvent être séparées par des virgules. Les requêtes sans en-tête `Origin` restent acceptées; les requêtes navigateur ne sont autorisées que depuis ces origines.
-4. Exécuter `npm run migrate:deploy` comme commande pre-deploy Railway afin d’appliquer les migrations Prisma.
-5. Sur Vercel, importer le même dépôt comme un second projet avec `notification/notification-web` comme dossier racine. Ajouter `NEXT_PUBLIC_API_URL` avec l’URL publique Railway, puis déployer. Cette variable étant intégrée au build du frontend, redéployer après l’avoir modifiée.
-6. Dans le tableau de bord, se connecter avec `ADMIN_API_TOKEN`. Ne pas ajouter ce jeton au projet frontend ni à une variable `NEXT_PUBLIC_*`.
+1. Sur Railway, créer un service PostgreSQL et importer le dépôt comme un second service avec `notification/notification-api` comme dossier racine. Définir la commande de build `npm run build`, la commande de démarrage `npm start` et le healthcheck `/health`.
+2. Dans les variables du service API Railway, définir `DATABASE_URL` comme référence à la variable `DATABASE_URL` du service PostgreSQL Railway. Supprimer toute ancienne variable `DATABASE_URL_UNPOOLED` qui pointe vers Neon : Prisma utilise cette variable en priorité pour les migrations. Sans elle, les migrations utilisent `DATABASE_URL` et donc PostgreSQL Railway.
+3. Configurer aussi `ADMIN_API_TOKEN`, `NOTIFICATION_API_TOKEN` et `SETTINGS_ENCRYPTION_KEY` dans le service API. `PORT` est fourni par Railway. Les variables Gmail/Vonage sont facultatives si les fournisseurs sont configurés depuis le tableau de bord.
+4. Créer le domaine public Railway, puis configurer `FRONTEND_URL` avec l’origine exacte du site Vercel, sans chemin ni slash final. Plusieurs origines peuvent être séparées par des virgules. Les requêtes sans en-tête `Origin` restent acceptées; les requêtes navigateur ne sont autorisées que depuis ces origines.
+5. Exécuter `npm run migrate:deploy` comme commande pre-deploy Railway afin de créer le schéma PostgreSQL dans la base Railway.
+6. Sur Vercel, importer le même dépôt comme un second projet avec `notification/notification-web` comme dossier racine. Ajouter `NEXT_PUBLIC_API_URL` avec l’URL publique Railway, puis déployer. Cette variable étant intégrée au build du frontend, redéployer après l’avoir modifiée.
+7. Dans le tableau de bord, se connecter avec `ADMIN_API_TOKEN`. Ne pas ajouter ce jeton au projet frontend ni à une variable `NEXT_PUBLIC_*`.
+
+Les données présentes dans une ancienne base Neon ne sont pas copiées par les migrations. Pour repartir proprement, ressaisir les identifiants fournisseur dans le tableau de bord. Pour conserver des secrets fournisseur déjà chiffrés lors d’un transfert, garder la même `SETTINGS_ENCRYPTION_KEY`.
 
 Pour les déploiements Preview Vercel, ajouter leurs origines à `FRONTEND_URL` dans Railway ou utiliser un domaine Preview stable. Garder les bases et secrets de Preview séparés de la production.
 
