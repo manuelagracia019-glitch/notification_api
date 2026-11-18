@@ -4,7 +4,8 @@ const test = require("node:test");
 const { createVerifyService } = require("../src/services/verifyService");
 
 function createService(overrides = {}) {
-  let credentials = { applicationId: "application-id", privateKey: "private-key" };
+  const testPrivateKey = "-----BEGIN PRIVATE KEY-----\nprivate-key-data\n-----END PRIVATE KEY-----";
+  let credentials = { applicationId: "application-id", privateKey: testPrivateKey };
   let clientOptions;
   const calls = [];
   const client = {
@@ -52,7 +53,7 @@ test("startVerification requests SMS followed by voice fallback", async () => {
 
   assert.deepEqual(getClientOptions(), {
     applicationId: "application-id",
-    privateKey: "private-key",
+    privateKey: "-----BEGIN PRIVATE KEY-----\nprivate-key-data\n-----END PRIVATE KEY-----",
   });
   assert.deepEqual(calls, [{
     method: "newRequest",
@@ -101,6 +102,34 @@ test("Verify requires an application ID and private key", async () => {
   await assert.rejects(
     service.startVerification({ to: "+237652236142", brand: "Courrier" }),
     /VONAGE_APPLICATION_ID and VONAGE_APPLICATION_PRIVATE_KEY must be configured/,
+  );
+});
+
+test("Verify normalizes escaped PEM line breaks before creating the client", async () => {
+  const { getClientOptions, service, setCredentials } = createService();
+  setCredentials({
+    applicationId: "application-id",
+    privateKey: "-----BEGIN PRIVATE KEY-----\\nprivate-key-data\\n-----END PRIVATE KEY-----",
+  });
+
+  await service.startVerification({ to: "+237652236142", brand: "Courrier" });
+
+  assert.equal(
+    getClientOptions().privateKey,
+    "-----BEGIN PRIVATE KEY-----\nprivate-key-data\n-----END PRIVATE KEY-----",
+  );
+});
+
+test("Verify rejects a public key as the private signing key", async () => {
+  const { service, setCredentials } = createService();
+  setCredentials({
+    applicationId: "application-id",
+    privateKey: "-----BEGIN PUBLIC KEY-----\npublic-key-data\n-----END PUBLIC KEY-----",
+  });
+
+  await assert.rejects(
+    service.startVerification({ to: "+237652236142", brand: "Courrier" }),
+    /must contain a PEM private key, not a public key/,
   );
 });
 

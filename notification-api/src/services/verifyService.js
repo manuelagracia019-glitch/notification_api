@@ -13,12 +13,15 @@ function createVerifyService({
   function getClient() {
     const credentials = getCredentials();
     const applicationId = (credentials.applicationId || "").trim();
-    const privateKey = (credentials.privateKey || "").trim();
+    const privateKey = (credentials.privateKey || "").replace(/\\n/g, "\n").trim();
 
     if (!applicationId || !privateKey) {
       throw new Error(
         "VONAGE_APPLICATION_ID and VONAGE_APPLICATION_PRIVATE_KEY must be configured for Verify.",
       );
+    }
+    if (!/-----BEGIN (?:RSA )?PRIVATE KEY-----/.test(privateKey)) {
+      throw new Error("VONAGE_APPLICATION_PRIVATE_KEY must contain a PEM private key, not a public key.");
     }
 
     const currentCredentials = `${applicationId}:${privateKey}`;
